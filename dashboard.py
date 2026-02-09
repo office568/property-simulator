@@ -58,9 +58,8 @@ def delete_from_google_sheets(name, user_email):
 defaults = {
     "rent_total": 0, "shikikin": 0, "reikin": 0, "broker_fee": 0, "photo": 0,
     "renov": 0, "furn": 0, "guar": 0, "fire": 0, "license": 0, "fire_work": 0, "other": 0,
-    "num_types": 1, "fixed_costs": 0, "target_profit": 500000, "val_prep": 2, "val_prep_num": 2,
-    "val_occ": 70.0, "val_occ_num": 70.0, "val_ota": 15.0, "val_ota_num": 15.0,
-    "val_mgmt": 20.0, "val_mgmt_num": 20.0, "val_cape": 3.0, "val_cape_num": 3.0
+    "num_types": 1, "fixed_costs": 0, "target_profit": 500000, 
+    "val_prep": 2, "val_occ": 70.0, "val_ota": 15.0, "val_mgmt": 20.0, "val_cape": 3.0
 }
 for key, val in defaults.items():
     if key not in st.session_state: st.session_state[key] = val
@@ -71,25 +70,13 @@ for i in range(5):
         if k not in st.session_state:
             st.session_state[k] = f"タイプ {chr(65+i)}" if "name" in k else (1 if "c_" in k else 0)
 
-# Sync Callbacks
-def update_prep_slider(): st.session_state.val_prep = st.session_state.val_prep_num
-def update_prep_num(): st.session_state.val_prep_num = st.session_state.val_prep
-def update_occ_slider(): st.session_state.val_occ = st.session_state.val_occ_num
-def update_occ_num(): st.session_state.val_occ_num = st.session_state.val_occ
-def update_ota_slider(): st.session_state.val_ota = st.session_state.val_ota_num
-def update_ota_num(): st.session_state.val_ota_num = st.session_state.val_ota
-def update_mgmt_slider(): st.session_state.val_mgmt = st.session_state.val_mgmt_num
-def update_mgmt_num(): st.session_state.val_mgmt_num = st.session_state.val_mgmt
-def update_cape_slider(): st.session_state.val_cape = st.session_state.val_cape_num
-def update_cape_num(): st.session_state.val_cape_num = st.session_state.val_cape
-
-# --- 5. SMART LOGIN, BOT BYPASS & SECURITY ---
+# --- 5. SMART LOGIN & BOT BYPASS ---
 def check_user():
     MASTER_CODE = "seirai@2026"
     query_params = st.query_params
     
     if "ping" in query_params:
-        st.write("System Status: 200 OK (Heartbeat Active)")
+        st.write("System Status: 200 OK")
         st.stop()
 
     if "email" in query_params and "code" in query_params:
@@ -101,11 +88,9 @@ def check_user():
     if "user_email" not in st.session_state:
         st.title("🏡 物件収支シミュレーター")
         st.info("登録済みのメールアドレスとパスコードを入力してください。")
-        
         col1, col2 = st.columns(2)
         email_input = col1.text_input("メールアドレス / Email").strip().lower()
         pass_input = col2.text_input("パスコード / Passcode", type="password")
-            
         if st.button("ログイン / Login", use_container_width=True):
             if "@" in email_input and pass_input == MASTER_CODE:
                 st.session_state["user_email"] = email_input
@@ -114,16 +99,8 @@ def check_user():
                 st.error("入力内容に誤りがあります。")
         
         st.markdown("---")
-        with st.container():
-            st.markdown("### 🛡️ セキュリティとプライバシー保護")
-            st.write("当システムは、お客様の財務データを安全に保護するため以下の対策を講じています。")
-            sec_col1, sec_col2 = st.columns(2)
-            with sec_col1:
-                st.markdown("**🔒 データの暗号化**\n通信はSSL/TLSで保護され、データは暗号化保存されます。")
-                st.markdown("**👤 プライバシー分離**\nデータは各ユーザーごとに厳密に分離され、他者に公開されません。")
-            with sec_col2:
-                st.markdown("**🔑 認証システム**\nパスコード認証により、第三者による不正アクセスを防止します。")
-                st.markdown("**📋 非公開の原則**\n保存データはサポート目的以外で使用されることはありません。")
+        st.markdown("### 🛡️ セキュリティとプライバシー保護")
+        st.write("通信はSSL/TLSで保護され、データは各ユーザーごとに厳格に分離されています。")
         return False
     return True
 
@@ -141,67 +118,63 @@ if st.sidebar.button("ログアウト"):
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ☁️ マイ物件 (Saved Projects)")
 
-if db.empty:
-    st.sidebar.info("保存されたデータはありません。")
-else:
+if not db.empty:
     target_prop = st.sidebar.selectbox("読み込む物件を選択", db['property_name'].tolist())
     c_load, c_del = st.sidebar.columns(2)
-    if c_load.button("📥 読み込む", use_container_width=True, help="保存されたデータをシミュレーターに反映させます。"):
+    if c_load.button("📥 読み込む", use_container_width=True, help="保存済みデータを反映します"):
         saved_row = db[db.property_name == target_prop].iloc[0]
         for key, value in saved_row.items():
             if key in ["property_name", "owner_email"]: continue
             st.session_state[key] = value
         st.rerun()
-    if c_del.button("🗑️ 削除", use_container_width=True, help="この物件データを完全に削除します。"):
+    if c_del.button("🗑️ 削除", use_container_width=True, help="データを削除します"):
         delete_from_google_sheets(target_prop, user_email)
         st.rerun()
 
 st.sidebar.markdown("---")
 
-# --- 7. INPUT SECTIONS ---
+# --- 7. INPUT SECTIONS WITH "i" ICONS ---
 with st.sidebar.expander("1. 初期費用・準備期間設定", expanded=True):
-    rent_total = st.number_input("月額ローン及び家賃 (円)", step=1000, key="rent_total", help="物件の毎月の家賃またはローン返済額を入力します。")
-    st.write("開業準備期間 (ヶ月)")
-    c_p1, c_p2 = st.columns([2, 1])
-    prep_months = c_p1.slider("Slider Prep", 0, 6, key="val_prep", on_change=update_prep_num, label_visibility="collapsed")
-    prep_months_num = c_p2.number_input("Num Prep", 0, 6, step=1, key="val_prep_num", on_change=update_prep_slider, label_visibility="collapsed", help="家具の組み立てやリフォームなど、売上ゼロで家賃だけが発生する期間です。")
+    rent_total = st.number_input("月額ローン及び家賃 (円)", step=1000, key="rent_total", help="毎月の家賃やローン返済額です。")
+    
+    st.write("開業準備期間 (ヶ月) ⓘ")
+    prep_months = st.slider("Prep Slider", 0, 6, key="val_prep", help="売上が発生せず家賃のみかかる期間です。")
     prep_rent_cost = rent_total * prep_months
     
     st.markdown("---")
-    shikikin = st.number_input("敷金 (円)", step=1000, key="shikikin", help="契約時に支払う敷金の総額です。")
-    reikin = st.number_input("礼金 (円)", step=1000, key="reikin", help="契約時に支払う礼金の総額です。")
-    broker_fee = st.number_input("仲介手数料 (円)", step=1000, key="broker_fee", help="不動産会社に支払う仲介手数料です。")
-    renovation = st.number_input("リフォーム (円)", step=10000, key="renov", help="壁紙、床、水回りなどの修繕・改装費用です。")
-    furniture_appliances = st.number_input("家具＋家電 (円)", step=10000, key="furn", help="ベッド、カーテン、家電、備品の購入費用です。")
-    license_fee = st.number_input("旅館業許可 (円)", step=1000, key="license", help="旅館業や民泊の申請に必要な行政書士費用や手数料です。")
-    fire_safety_work = st.number_input("消防設備の工事 (円)", step=1000, key="fire_work", help="誘導灯や火災報知器などの設置工事費用です。")
-    other_init = st.number_input("その他予備費 (円)", step=1000, key="other", help="写真撮影代や予備の運転資金などです。")
+    shikikin = st.number_input("敷金 (円)", step=1000, key="shikikin", help="契約時の敷金総額です。")
+    reikin = st.number_input("礼金 (円)", step=1000, key="reikin", help="契約時の礼金総額です。")
+    broker_fee = st.number_input("仲介手数料 (円)", step=1000, key="broker_fee", help="不動産会社への手数料です。")
+    renovation = st.number_input("リフォーム (円)", step=10000, key="renov", help="改装・修繕費用です。")
+    furniture_appliances = st.number_input("家具＋家電 (円)", step=10000, key="furn", help="備品・家電の購入費です。")
+    license_fee = st.number_input("旅館業許可 (円)", step=1000, key="license", help="申請代行や手数料です。")
+    fire_safety_work = st.number_input("消防設備の工事 (円)", step=1000, key="fire_work", help="消防設備設置の工事費です。")
+    other_init = st.number_input("その他予備費 (円)", step=1000, key="other", help="写真撮影や予備資金です。")
 
 st.sidebar.markdown("### 2. 部屋タイプ別の設定")
-num_types = int(st.sidebar.number_input("部屋タイプの種類数", min_value=1, max_value=5, step=1, key="num_types", help="広さや料金が異なる部屋が何種類あるか指定します。"))
+num_types = int(st.sidebar.number_input("部屋タイプの種類数", min_value=1, max_value=5, step=1, key="num_types", help="部屋のバリエーション数です。"))
 room_configs = []
 for i in range(num_types):
     with st.sidebar.expander(f"部屋タイプ {i+1}", expanded=True):
-        r_name = st.text_input("タイプ名", key=f"name_{i}", help="『2F 1LDK』や『スイートルーム』などの管理用の名前です。")
-        r_count = st.number_input("部屋数", min_value=1, step=1, key=f"c_{i}", help="このタイプの部屋が建物内にいくつあるか入力します。")
-        r_adr = st.number_input("ADR (円)", step=500, key=f"a_{i}", help="平均客室単価。1泊あたりの平均販売価格です。")
-        r_cons = st.number_input("消耗品/泊 (円)", step=10, key=f"cons_{i}", help="1泊あたりにかかる洗剤、アメニティ、トイレットペーパー等の実費です。")
-        r_util = st.number_input("光熱費/泊 (円)", step=10, key=f"u_{i}", help="宿泊客が使用する電気・ガス・水道代の1泊あたりの平均です。")
+        r_name = st.text_input("タイプ名", key=f"name_{i}", help="管理用の名称（例：1F A号室）。")
+        r_count = st.number_input("部屋数", min_value=1, step=1, key=f"c_{i}", help="このタイプの総部屋数。")
+        r_adr = st.number_input("ADR (円)", step=500, key=f"a_{i}", help="1泊あたりの平均客室単価。")
+        r_cons = st.number_input("消耗品/泊 (円)", step=10, key=f"cons_{i}", help="1泊あたりのアメニティ等の実費。")
+        r_util = st.number_input("光熱費/泊 (円)", step=10, key=f"u_{i}", help="1泊あたりの電気・水道代の平均。")
         room_configs.append({"name": r_name, "count": r_count, "adr": r_adr, "consumables": r_cons, "util_day": r_util})
 
 with st.sidebar.expander("3. 運営コスト・稼働率設定", expanded=True):
-    st.write("想定稼働率 %")
-    c_occ1, c_occ2 = st.columns([2, 1])
-    target_occ = c_occ1.slider("S_Occ", 10.0, 100.0, step=0.1, key="val_occ", on_change=update_occ_num, label_visibility="collapsed")
-    target_occ_num = c_occ2.number_input("N_Occ", 10.0, 100.0, step=0.1, key="val_occ_num", on_change=update_occ_slider, label_visibility="collapsed", help="月間で部屋が埋まる割合です（例：70% = 月21日稼働）。")
+    # FIXED: Combined Input for Occupancy
+    st.write("想定稼働率 % ⓘ")
+    target_occ = st.slider("想定稼働率 %", 0.0, 100.0, key="val_occ", help="月間で部屋が埋まる割合です。")
     
-    ota_fee_rate = st.number_input("OTA手数料 %", step=0.1, key="val_ota_num", help="AirbnbやBooking.com、楽天トラベルなどの予約サイトに支払う手数料の割合です。")
-    management_fee_rate = st.number_input("管理費 %", step=0.5, key="val_mgmt_num", help="運営代行会社に支払う管理委託料の割合です。")
-    fixed_op_costs = st.number_input("ソフト・ネット・その他固定費", step=1000, key="fixed_costs", help="PMS（予約管理システム）利用料やインターネット固定代金です。")
-    cape_rate = st.number_input("メンテ (CAPEX) %", step=0.5, key="val_cape_num", help="将来の修繕や備品の買い替えのために、売上から積み立てておく修繕引当金の割合です。")
+    ota_fee_rate = st.number_input("OTA手数料 %", step=0.1, key="val_ota", help="予約サイトに支払う手数料率です。")
+    management_fee_rate = st.number_input("管理費 %", step=0.5, key="val_mgmt", help="代行会社への委託料率です。")
+    fixed_op_costs = st.number_input("ソフト・ネット・その他固定費", step=1000, key="fixed_costs", help="PMSやネット代金です。")
+    cape_rate = st.number_input("メンテ (CAPEX) %", step=0.5, key="val_cape", help="将来の修繕のための積立率です。")
 
 with st.sidebar.expander("4. 目標利益の設定", expanded=True):
-    target_profit_val = st.number_input("目標月間利益 (円)", step=10000, key="target_profit", help="あなたが毎月手元に残したい理想の利益額を入力してください。")
+    target_profit_val = st.number_input("目標月間利益 (円)", step=10000, key="target_profit", help="手元に残したい理想の金額です。")
 
 # --- 8. CALCULATIONS ---
 days = 30
@@ -225,12 +198,12 @@ avg_var_per_night = sum((r['consumables'] + r['util_day']) * r['count'] for r in
 
 # SAVE ACTION
 st.sidebar.markdown("---")
-new_save_name = st.sidebar.text_input("物件名を入力して保存", key="save_input_name", help="この名前でシミュレーション結果をクラウドに保存します。")
+new_save_name = st.sidebar.text_input("物件名を入力して保存", key="save_input_name", help="クラウドにデータを保存します。")
 if st.sidebar.button("💾 クラウドに保存", use_container_width=True):
     if not new_save_name:
         st.sidebar.error("物件名を入力してください。")
     else:
-        to_save = {k: v for k, v in st.session_state.items() if not k.startswith("user_") and "_slider" not in k and "_num" not in k}
+        to_save = {k: v for k, v in st.session_state.items() if not k.startswith("user_") and "_slider" not in k}
         save_to_google_sheets(new_save_name, user_email, to_save)
         st.sidebar.success(f"保存完了: {new_save_name}")
         st.rerun()
@@ -238,13 +211,13 @@ if st.sidebar.button("💾 クラウドに保存", use_container_width=True):
 # --- 9. MAIN DASHBOARD ---
 st.subheader("📌 収支シミュレーション結果")
 m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("初期投資合計", fmt(startup_cost), help="物件をオープンするまでにかかる費用の総額です。")
-m2.metric("月間想定売上", fmt(total_rev), help="設定したADRと稼働率に基づいた、月間の予想総売上です。")
+m1.metric("初期投資合計", fmt(startup_cost), help="開業までにかかる総費用です。")
+m2.metric("月間想定売上", fmt(total_rev), help="設定条件での予想総売上です。")
 e_ratio = (monthly_cost / total_rev * 100) if total_rev > 0 else 0
 st.markdown("<style>[data-testid='stMetricDelta'] svg { display: none; }</style>", unsafe_allow_html=True)
-m3.metric("月間費用合計", fmt(monthly_cost), f"費用率 {e_ratio:.1f}%", delta_color="inverse", help="家賃、手数料、光熱費、管理費など、毎月の全ての出費の合計です。")
-m4.metric("月間営業利益", fmt(profit), f"利益率 {(profit/total_rev*100):.1f}%" if total_rev > 0 else "", help="売上から費用を引いた、最終的な手残り金額です。")
-m5.metric("投資回収期間", f"{payback:.1f} ヶ月" if profit > 0 else "回収不可", help="初期投資を利益だけで回収し終えるまでの予想期間です。")
+m3.metric("月間費用合計", fmt(monthly_cost), f"費用率 {e_ratio:.1f}%", delta_color="inverse", help="手数料等を含む全ての月間支出です。")
+m4.metric("月間営業利益", fmt(profit), f"利益率 {(profit/total_rev*100):.1f}%" if total_rev > 0 else "", help="売上から支出を引いた最終手残りです。")
+m5.metric("投資回収期間", f"{payback:.1f} ヶ月" if profit > 0 else "回収不可", help="初期投資を完済するまでの予想期間です。")
 
 st.divider()
 cl, cr = st.columns(2)
@@ -266,10 +239,10 @@ st.write(f"**現在の目標月間利益: {fmt(target_profit_val)}**")
 col_be1, col_be2 = st.columns([1, 2])
 with col_be1:
     st.info("**基本ユニット分析 / Unit Analysis**")
-    st.metric(label="平均変動費 / 泊", value=fmt(round(avg_var_per_night)), help="1泊ごとに発生するコスト（光熱費・消耗品）の平均です。")
-    st.metric(label="固定費合計 / 月", value=fmt(round(fixed_monthly)), help="稼働に関わらず毎月必ず支払うコスト（家賃・固定固定費）の合計です。")
+    st.metric(label="平均変動費 / 泊", value=fmt(round(avg_var_per_night)), help="1宿泊ごとにかかる実費。")
+    st.metric(label="固定費合計 / 月", value=fmt(round(fixed_monthly)), help="稼働に関わらず発生する月額コスト。")
     cm_ratio = (1 - total_var_rate) * 100
-    st.metric(label="貢献利益率", value=f"{round(cm_ratio)}%", help="売上100円のうち、手数料などを支払った後に『家賃や固定費』の支払いに回せる金額の割合です。")
+    st.metric(label="貢献利益率", value=f"{round(cm_ratio)}%", help="売上から手数料等を除いた、家賃支払いに回せる利益の割合。")
 
 with col_be2:
     st.write(f"**稼働率別：損益分岐点と目標達成ADR**")
@@ -280,10 +253,7 @@ with col_be2:
             be_adr = ((fixed_monthly / occ_nights) + avg_var_per_night) / (1 - total_var_rate)
             target_adr = ((fixed_monthly + target_profit_val) / occ_nights + avg_var_per_night) / (1 - total_var_rate)
             be_rows.append({"稼働率": f"{occ_p}%", "損益分岐ADR": round(be_adr), "目標達成ADR": round(target_adr)})
-    be_df = pd.DataFrame(be_rows)
-    st.table(be_df.style.format({"損益分岐ADR": "¥{:,.0f}", "目標達成ADR": "¥{:,.0f}"}))
-
-
+    st.table(pd.DataFrame(be_rows).style.format({"損益分岐ADR": "¥{:,.0f}", "目標達成ADR": "¥{:,.0f}"}))
 
 st.divider()
 st.subheader("📊 稼働率別の詳細収支感度分析")
