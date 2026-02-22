@@ -125,7 +125,7 @@ if not db.empty:
 # --- 7. INPUTS ---
 with st.sidebar.expander("1. Initial Costs & Prep Period", expanded=True):
     rent_total = st.number_input("Monthly Rent/Loan (円)", min_value=0, step=1000, key="rent_total")
-    val_prep = st.number_input("Prep Period (Months) ⓘ", min_value=0, max_value=12, key="val_prep", help="Months with rent but no revenue")
+    val_prep = st.number_input("Prep Period (Months) ⓘ", min_value=0, max_value=12, key="val_prep")
     prep_rent_cost = rent_total * val_prep
     st.markdown("---")
     shikikin = st.number_input("Security Deposit (円)", min_value=0, step=1000, key="shikikin")
@@ -144,7 +144,7 @@ room_configs = []
 for i in range(num_types):
     with st.sidebar.expander(f"Room Type {i+1}", expanded=True):
         r_count = st.number_input(f"Room Count {i+1}", min_value=1, key=f"c_{i}")
-        r_adr = st.number_input(f"ADR (円) {i+1}", min_value=0, step=500, key=f"a_{i}", help="Average Daily Rate")
+        r_adr = st.number_input(f"ADR (円) {i+1}", min_value=0, step=500, key=f"a_{i}")
         r_cons = st.number_input(f"Consumables/Night {i+1}", min_value=0, step=10, key=f"cons_{i}")
         r_util = st.number_input(f"Utilities/Night {i+1}", min_value=0, step=10, key=f"u_{i}")
         room_configs.append({"count": r_count, "adr": r_adr, "cons": r_cons, "util": r_util})
@@ -153,7 +153,7 @@ with st.sidebar.expander("3. OpEx & Occupancy", expanded=True):
     val_occ = st.number_input("Occupancy % ⓘ", min_value=0.0, max_value=100.0, step=0.1, key="val_occ")
     ota_fee = st.number_input("OTA Commission %", min_value=0.0, step=0.1, key="val_ota")
     mgmt_fee = st.number_input("Management Fee %", min_value=0.0, step=0.5, key="val_mgmt")
-    fixed_op = st.number_input("Monthly Fixed OpEx (円)", min_value=0, step=1000, key="fixed_costs", help="Internet, PMS, etc.")
+    fixed_op = st.number_input("Monthly Fixed OpEx (円)", min_value=0, step=1000, key="fixed_costs")
     capex_r = st.number_input("Maintenance (CAPEX) %", min_value=0.0, step=0.5, key="val_cape")
 
 with st.sidebar.expander("4. Profit Target", expanded=True):
@@ -163,10 +163,10 @@ with st.sidebar.expander("4. Profit Target", expanded=True):
 days = 30
 occ_rate = val_occ / 100
 total_rev = sum(r['adr'] * r['count'] * days * occ_rate for r in room_configs)
-total_var_costs_per_night = sum((r['cons'] + r['util']) * r['count'] * days * occ_rate for r in room_configs)
+total_var_costs = sum((r['cons'] + r['util']) * r['count'] * days * occ_rate for r in room_configs)
 fee_total_rate = (ota_fee + mgmt_fee + capex_r) / 100
 commissions = total_rev * fee_total_rate
-monthly_exp = rent_total + total_var_costs_per_night + fixed_op + commissions
+monthly_exp = rent_total + total_var_costs + fixed_op + commissions
 profit = total_rev - monthly_exp
 startup_total = prep_rent_cost + shikikin + reikin + broker_fee + guar_fee + renovation + furn + license_fee + fire_work + other_init
 payback = startup_total / profit if profit > 0 else 0
@@ -185,11 +185,13 @@ cl, cr = st.columns(2)
 with cl:
     st.subheader("💰 Startup Breakdown")
     df_i = pd.DataFrame({"Item": ["Prep Rent","Deposit","Key Money","Broker","Insurance","Renov","Furniture","License","Fire Safety","Other"],"Value": [prep_rent_cost, shikikin, reikin, broker_fee, guar_fee, renovation, furn, license_fee, fire_work, other_init]})
-    st.plotly_chart(px.pie(df_i[df_i["Value"]>0], values='Value', names='Item', hole=0.5), use_container_width=True)
+    # Added unique ID to plotly chart
+    st.plotly_chart(px.pie(df_i[df_i["Value"]>0], values='Value', names='Item', hole=0.5), use_container_width=True, key="startup_pie_chart")
 with cr:
     st.subheader("💸 Monthly Expenses")
-    df_m = pd.DataFrame({"Item": ["Rent", "Variable", "Fixed", "Fees", "Profit"],"Value": [rent_total, total_var_costs_per_night, fixed_op, commissions, max(0, profit)]})
-    st.plotly_chart(px.pie(df_m[df_m["Value"]>0], values='Value', names='Item', hole=0.5), use_container_width=True)
+    df_m = pd.DataFrame({"Item": ["Rent", "Variable", "Fixed", "Fees", "Profit"],"Value": [rent_total, total_var_costs, fixed_op, commissions, max(0, profit)]})
+    # Added unique ID to plotly chart
+    st.plotly_chart(px.pie(df_m[df_m["Value"]>0], values='Value', names='Item', hole=0.5), use_container_width=True, key="monthly_pie_chart")
 
 # --- 10. STRATEGY ANALYSIS ---
 st.divider()
@@ -201,7 +203,7 @@ col_info, col_table = st.columns([1, 2])
 
 with col_info:
     fixed_total = rent_total + fixed_op
-    st.info("**Current Setup**")
+    st.info("**Current Setup Summary**")
     st.metric("Total Monthly Fixed Costs", fmt(fixed_total))
     st.metric("Target Monthly Profit", fmt(target_profit_val))
     cm_ratio = (1 - fee_total_rate) * 100
@@ -220,10 +222,9 @@ with col_table:
             be_data.append({"Occ": f"{o}%", "Breakeven ADR": fmt(be_adr), "Target Profit ADR": fmt(tg_adr)})
     st.table(pd.DataFrame(be_data))
 
-# SECTION B: SENSITIVITY ANALYSIS (The restored section)
-
+# SECTION B: SENSITIVITY ANALYSIS
 st.markdown("#### B. Sensitivity Analysis (Detailed Profit Breakdown)")
-st.caption("How total profit changes based on occupancy, using your *current* ADR settings.")
+st.caption("Profitability at your CURRENT set price across different occupancy levels.")
 
 sensitivity_rows = []
 avg_adr_current = sum(r['adr'] * r['count'] for r in room_configs) / tot_rooms if tot_rooms > 0 else 0
